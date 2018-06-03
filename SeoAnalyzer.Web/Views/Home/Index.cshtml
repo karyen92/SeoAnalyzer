@@ -1,0 +1,208 @@
+﻿@{
+    ViewBag.Title = "Seo Analyzer";
+}
+
+<div class="blog-post">
+    <div class="container">
+        <h3 class="blog-post-title">
+            Seo Analyzer
+        </h3>
+
+        <div class="blog-post-content">
+            <p>
+                Please select an option prior to analyze:
+            </p>
+            <fieldset class="form-group">
+                <legend>Analysis Option</legend>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input type="radio" class="form-check-input" name="optionsRadios" id="optionsRadios1" value="Text" checked>
+                        Analyze Text
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input type="radio" class="form-check-input" name="optionsRadios" id="optionsRadios2" value="Webpage">
+                        Analyze a Web Page (by fill in URL)
+                    </label>
+                </div>
+                <small id="category-error" class="text-danger"></small>
+            </fieldset>
+            <div class="form-group" id="webpage-input">
+                <label for="url">URL</label>
+                <input id="url" name="url" type="url" class="form-control" placeholder="Enter url e.g: http://xxx or https://yyy">
+                <small id="url-error" class="text-danger"></small>
+            </div>
+            <div class="form-group" id="text-input">
+                <label for="text">Text</label>
+                <textarea id="text" name="text" class="form-control" placeholder="Enter your text here..." rows="10"></textarea>
+                <small id="text-error" class="text-danger"></small>
+            </div>
+            <div class="form-group">
+                <button onclick="analyze()" class="btn btn-primary" type="button">SUBMIT</button>
+            </div>
+            <h2><strong>Analysis Result</strong></h2>
+            <div>
+                <h5>1. Unique words</h5>
+                <table id="wordTable" class="table">
+                    <thead>
+                    <tr>
+                        <th>Word</th>
+                        <th>Count</th>
+                    </tr>
+                    </thead>
+                    <tfoot>
+                    <tr>
+                        <th>Word</th>
+                        <th>Count</th>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div>
+                <h5>2. Metas <small>Only applicable to webpage</small></h5>
+                <table id="metaTable" class="table">
+                    <thead>
+                    <tr>
+                        <th>Word</th>
+                        <th>Count</th>
+                    </tr>
+                    </thead>
+                    <tfoot>
+                    <tr>
+                        <th>Word</th>
+                        <th>Count</th>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div>
+                <h5>3. External Links <small>Only applicable to webpage</small></h5>
+                <table id="linkTable" class="table">
+                    <thead>
+                    <tr>
+                        <th>Link</th>
+                        <th>Count</th>
+                    </tr>
+                    </thead>
+                    <tfoot>
+                    <tr>
+                        <th>Link</th>
+                        <th>Count</th>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="loader-wrapper">
+    <h1 class="text-center">Analyzing...</h1>
+</div>
+<style>
+     #loader-wrapper{
+         position: fixed;
+         top: 0;
+         width: 100%;
+         height: 100%;
+         background: #efefef;
+         opacity: 0.5;
+         z-index: 1000;
+     }
+</style>
+
+<script type="text/javascript">
+    $('#loader-wrapper').hide();
+    //initialize word table on the start
+    var wordTable = $('#wordTable').DataTable({
+        "columns": [
+            { "data": "word" },
+            { "data": "count" },
+        ]
+    });
+
+    var metaTable = $('#metaTable').DataTable({
+        "columns": [
+            { "data": "word" },
+            { "data": "count" },
+        ]
+    });
+
+    var linkTable = $('#linkTable').DataTable({
+        "columns": [
+            { "data": "word" },
+            { "data": "count" },
+        ]
+    });
+
+    //by default hide webpage input first
+    $('#webpage-input').hide();
+
+    //radio button change
+    var $radio = $('input[type="radio"]');
+
+    $radio.on('change', function () {
+        var $this = $(this);
+       
+        if ($this[0].value == 'Webpage') {
+            $('#text-input').hide();
+            $('#webpage-input').show();
+        }
+        if ($this[0].value == 'Text') {
+            $('#text-input').show();
+            $('#webpage-input').hide();
+        }
+    });
+
+    function analyze() {
+       
+        var category = $('input[name="optionsRadios"]:checked').val();
+        var input = "";
+        if (category == 'Text') {
+            input = document.getElementById('text').value;
+        } else if (category == 'Webpage') {
+            input = document.getElementById('url').value;
+        }
+
+        //remove all errors
+        $("#text").removeClass("is-invalid");
+        $('#text-error').text("");
+        $("#url").removeClass("is-invalid");
+        $('#url-error').text("");
+        $('#category-error').text("");
+
+        $.ajax({
+            url: '@Url.Action("post", "api/analyzer", new {area = ""})',
+            type: "POST",
+            datatype: "application/json",
+            data: {
+                category: category,
+                input: input
+            },
+            beforeSend: function () {
+                $('#loader-wrapper').show();
+            },
+            complete: function () {
+                $('#loader-wrapper').hide();
+            },
+            success: function (data) {
+               
+                if (data.success) {
+                    wordTable.clear().rows.add(data.words).draw();
+                    metaTable.clear().rows.add(data.meta).draw();
+                    linkTable.clear().rows.add(data.links).draw();
+                   
+                } else {
+                    $('#category-error').text(data.validationResult['category']);
+                    if (data.category == 'Webpage') {
+                        $("#url").addClass("is-invalid");
+                        $('#url-error').text(data.validationResult['input']);
+                    }else if (data.category == 'Text') {
+                        $("#text").addClass("is-invalid");
+                        $('#text-error').text(data.validationResult['input']);
+                    }
+                }
+            }
+        });
+    }
+</script>
